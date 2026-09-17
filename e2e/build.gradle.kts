@@ -65,8 +65,6 @@ kotlin {
         binaries.executable()
         browser {
             test {
-                headless = false
-                this.timeout = 10.minutes
                 firefox()
             }
         }
@@ -76,7 +74,7 @@ kotlin {
         browser {
             testTask {
                 useKarma {
-                    useFirefox()
+                    useFirefoxHeadless()
                 }
             }
             /*test {
