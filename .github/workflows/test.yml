@@ -1,7 +1,7 @@
 name: Test
 
 on:
-  pull_request_target:
+  pull_request:
     branches:
       - main
       - dev
@@ -17,6 +17,11 @@ on:
       - 'doc/**'
       - '**.md'
       - '**.txt'
+
+permissions:
+  checks: write
+  contents: read
+
 jobs:
   test:
     runs-on: ubuntu-latest
@@ -35,4 +40,10 @@ jobs:
           cache-read-only: false
       - name: Test
         run: ./gradlew e2e:jsBrowserTest e2e:wasmJsBrowserTest
+      - name: Publish Test Report
+        id: report
+        uses: mikepenz/action-junit-report@v6
+        if: success() || failure() # always run even if the previous step fails
+        with:
+          report_paths: '**/build/test-results/**/TEST-*.xml'
 
