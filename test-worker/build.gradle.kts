@@ -23,6 +23,7 @@ kotlin {
     wasmJs {
         binaries.executable()
         browser()
+        asWebWorker()
     }
 
     sourceSets {

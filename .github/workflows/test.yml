@@ -1,0 +1,38 @@
+name: Test
+
+on:
+  pull_request_target:
+    branches:
+      - main
+      - dev
+    paths-ignore:
+      - 'doc/**'
+      - '**.md'
+      - '**.txt'
+  push:
+    branches:
+      - main
+      - dev
+    paths-ignore:
+      - 'doc/**'
+      - '**.md'
+      - '**.txt'
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v6
+        with:
+          cache-read-only: false
+      - name: Test
+        run: ./gradlew e2e:jsBrowserTest e2e:wasmJsBrowserTest
+

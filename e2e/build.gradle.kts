@@ -6,7 +6,9 @@ import org.jetbrains.kotlin.gradle.ExperimentalKotlinGradlePluginApi
 import org.jetbrains.kotlin.gradle.ExperimentalWasmDsl
 import org.jetbrains.kotlin.gradle.targets.native.tasks.KotlinNativeTest
 import org.jetbrains.kotlin.gradle.tasks.KotlinTest
+import java.time.Duration
 import kotlin.time.Duration.Companion.minutes
+import kotlin.time.toJavaDuration
 
 plugins {
     alias(libs.plugins.multiplatform)
@@ -72,6 +74,11 @@ kotlin {
     wasmJs {
         binaries.executable()
         browser {
+            testTask {
+                useKarma {
+                    useFirefox()
+                }
+            }
             /*test {
                 firefox()
             }*/
@@ -104,8 +111,6 @@ kotlin {
 dependencies {
     "jsWorker"(project(":test-worker", configuration = "jsWorkerOutput"))
     "wasmJsWorker"(project(":test-worker"))
-//    workerArtifactWasm(project(":test-worker"))
-//    workerArtifactJs(project(":test-worker"))
 }
 
 tasks.withType<Test>().configureEach {

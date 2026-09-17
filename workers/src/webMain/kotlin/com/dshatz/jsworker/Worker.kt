@@ -2,6 +2,7 @@
 
 package com.dshatz.jsworker
 
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -31,16 +32,27 @@ import kotlin.js.toJsString
 import kotlin.js.unsafeCast
 
 
-fun createWorkerFromModule(scriptURL: String): Worker {
+fun createWorkerFromModule(scriptURL: String): CompletableDeferred<Worker> {
     println("Creating worker $scriptURL")
-    return Worker(scriptURL, WorkerOptions(WorkerType.MODULE))
+    val worker = Worker(scriptURL, WorkerOptions(WorkerType.MODULE))
+    val result = CompletableDeferred<Worker>()
+    worker.addEventListener("message") { e ->
+        if (result.isActive && e is MessageEvent) {
+            val data = e.data
+            if (data != null && (data as? JsString)?.toString() == "READY") {
+                println("Worker initialized")
+                result.complete(worker)
+            }
+            e
+        }
+    }
+    return result
 }
 public external open class Worker(
     scriptURL: String,
     options: WorkerOptions = definedExternally
 ) : EventTarget,
     AbstractWorker {
-    var onmessage: ((MessageEvent) -> JsAny)?
     var onmessageerror: ((Event) -> Unit)?
     override var onerror: ((Event) -> Unit)?
     fun terminate()
@@ -64,15 +76,16 @@ inline fun <reified T, reified R> Worker.sendIgnoreResult(data: T) {
 inline suspend fun <reified T, reified R> Worker.send(data: T): R = suspendCancellableCoroutine<R> { continuation ->
     val callId = callCounter.incrementAndFetch()
     println("Making call callId = $callId, data = $data")
-    val listener = object: EventListener {
-        override fun handleEvent(event: Event) {
-            event as MessageEvent
+    val listener = { event: Event ->
+        if (event is MessageEvent) {
             val responseText = (event.data as JsString).toString()
             val parsed = workerJson.decodeFromString<WorkerResponse<JsonElement>>(responseText)
             if (parsed.callId == callId) {
                 val response = workerJson.decodeFromJsonElement<R>(parsed.response)
                 continuation.resume(response)
             }
+        } else {
+            println("WARN: Event is $event")
         }
     }
     addEventListener("message", listener)

@@ -52,6 +52,8 @@ class JSWorkerProcessorProvider : SymbolProcessorProvider {
                 .filterIsInstance<KSClassDeclaration>()
             val workers = collectWorkers(workerFilename, workerClasses)
 
+            val deps = Dependencies(true, sources = workerClasses.mapNotNull { it.containingFile }.toList().toTypedArray())
+
             workers.flatMap {
                 listOf(
                     generateRequests(it),
@@ -59,33 +61,30 @@ class JSWorkerProcessorProvider : SymbolProcessorProvider {
                     generateProxy(it)
                 )
             }.forEach {
-                it.writeTo(codeGenerator, Dependencies(true, sources = workerClasses.mapNotNull { it.containingFile }.toList().toTypedArray()))
+                it.writeTo(codeGenerator, deps)
             }
+
             return emptyList()
         }
 
         private fun generateProxy(worker: WorkerDesc): FileSpec {
-            val proxyCls = ClassName(worker.cls.packageName, worker.cls.simpleName + "WebWorker")
+            val proxyCls = worker.proxyClass
             val f = FileSpec.builder(proxyCls)
             val type = TypeSpec.classBuilder(proxyCls)
                 .addProperty(
-                    PropertySpec.builder("worker", Types.Worker)
-                        .delegate(
-                            CodeBlock.builder()
-                                .beginControlFlow("lazy")
-                                .addStatement("%M(%S)", Types.Members.createWorkerFromModule, "workers/${worker.workerFileName}")
-                                .endControlFlow()
-                                .build()
-                        )
+                    PropertySpec.builder("worker", Types.CompletableDeferred.parameterizedBy(Types.Worker))
+                        .initializer("%M(%S)", Types.Members.createWorkerFromModule, "workers/${worker.workerFileName}")
+                        .build()
+                )
+                .addProperty(
+                    PropertySpec.builder("readyWorker", Types.CompletableDeferred.parameterizedBy(Types.Worker))
+                        .initializer("%T()", Types.CompletableDeferred)
                         .build()
                 )
 
             val funSpecs = worker.functions.map { f ->
-                val spec = FunSpec.builder(f.name)
+                val spec = f.funBuilder()
                     .addModifiers(KModifier.SUSPEND)
-                f.parameters.forEach {
-                    spec.addParameter(ParameterSpec(it.name, it.type))
-                }
 
                 val createReq = if (f.parameters.isEmpty()) {
                     CodeBlock.of("%T", f.reqClassName)
@@ -95,15 +94,12 @@ class JSWorkerProcessorProvider : SymbolProcessorProvider {
                     })
                 }
                 spec.returns(f.returnType)
-                    .addStatement("return worker.%M<%T, %T>(%L)", Types.Members.send, worker.cls.reqSealedClass(), f.returnType, createReq)
+                    .addStatement("return readyWorker.await().%M<%T, %T>(%L)", Types.Members.send, worker.cls.reqSealedClass(), f.returnType, createReq)
                 spec.build()
             }
 
             val constructorSpecs = worker.constructors.map { c ->
-                val spec = FunSpec.constructorBuilder()
-                c.parameters.forEach {
-                    spec.addParameter(ParameterSpec(it.name, it.type))
-                }
+                val spec = c.constructorBuilder()
                 val createReq = if (c.parameters.isEmpty()) {
                     CodeBlock.of("%T", c.reqClassName)
                 } else {
@@ -111,11 +107,22 @@ class JSWorkerProcessorProvider : SymbolProcessorProvider {
                         CodeBlock.of("%N", it.name)
                     })
                 }
-                spec.addCode("worker.%M<%T, %T>(%L)",
-                    Types.Members.sendIgnoreResult,
-                    worker.cls.reqSealedClass(),
-                    c.returnType,
-                    createReq
+                spec.addCode(
+                    CodeBlock.builder()
+                        .beginControlFlow("worker.invokeOnCompletion")
+                        .beginControlFlow("if (it == null)")
+                        .addStatement("val w = worker.getCompleted()")
+                        .addStatement(
+                            "w.%M<%T, %T>(%L)",
+                            Types.Members.sendIgnoreResult,
+                            worker.cls.reqSealedClass(),
+                            c.returnType,
+                            createReq
+                        )
+                        .addStatement("readyWorker.complete(w)")
+                        .endControlFlow() // if
+                        .endControlFlow() // invokeOnCompletion
+                        .build()
                 )
                 spec.build()
             }
@@ -204,8 +211,8 @@ class JSWorkerProcessorProvider : SymbolProcessorProvider {
                 WorkerDesc(
                     cls,
                     workerFileName = workerFileName,
-                    funs.toList(),
-                    constructors.toList()
+                    functions = funs.toList(),
+                    constructors = constructors.toList()
                 )
             }
         }

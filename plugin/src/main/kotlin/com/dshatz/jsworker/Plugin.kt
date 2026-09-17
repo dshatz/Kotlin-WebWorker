@@ -9,16 +9,19 @@ import org.gradle.api.attributes.Usage
 import org.gradle.api.internal.file.DefaultFilePropertyFactory
 import org.gradle.api.provider.Provider
 import org.gradle.api.tasks.Copy
+import org.gradle.api.tasks.Sync
 import org.gradle.language.jvm.tasks.ProcessResources
 import org.jetbrains.kotlin.gradle.dsl.KotlinMultiplatformExtension
-import org.jetbrains.kotlin.gradle.internal.builtins.StandardNames.FqNames.target
+import org.jetbrains.kotlin.gradle.dsl.kotlinExtension
 import org.jetbrains.kotlin.gradle.plugin.KotlinPlatformType
 import org.jetbrains.kotlin.gradle.plugin.KotlinTarget
 import org.jetbrains.kotlin.gradle.targets.js.KotlinWasmTargetAttribute
 import org.jetbrains.kotlin.gradle.targets.js.dsl.KotlinJsTargetDsl
-import org.jetbrains.kotlin.gradle.targets.js.dsl.KotlinWasmJsTargetDsl
-import org.jetbrains.kotlin.gradle.targets.js.ir.KotlinJsIrTarget
-import org.jetbrains.kotlin.gradle.targets.js.webpack.KotlinWebpack
+import org.jetbrains.kotlin.gradle.targets.js.ir.DefaultIncrementalSyncTask
+import org.jetbrains.kotlin.gradle.targets.js.testing.KotlinJsTest
+import org.jetbrains.kotlin.gradle.tasks.IncrementalSyncTask
+import java.io.File
+import kotlin.jvm.java
 
 class Plugin: Plugin<Project> {
 
@@ -53,29 +56,11 @@ class Plugin: Plugin<Project> {
         input: Configuration,
         output: Configuration
     ) {
-        /*val distTaskName = "${target}BrowserDistribution"
-
-        val copyTaskName = "copyWorkerDistribution${target.capitalize()}"
-        project.tasks.register(copyTaskName, Copy::class.java) {
-            it.destinationDir = project.layout.buildDirectory.dir("workerDistribution").get().asFile
-            val distTask = tasks.named(distTaskName)
-            it.from(distTask)
-            it.dependsOn(distTask)
-        }
-
-        artifacts {
-            it.add(output.name, tasks.named(copyTaskName, Copy::class.java).map { it.destinationDir }) { artifact ->
-                artifact.builtBy(tasks.named(copyTaskName))
-            }
-        }*/
-
-
-
         // Retrieve dependencies from incoming configuration:
 
         // 1. Add to executable resources.
         tasks.withType(ProcessResources::class.java).configureEach {
-            if (it.name in setOf("${target}ProcessResources", "${target}ProcessTestResources")) {
+            if (it.name in setOf("${target}ProcessResources", "${target}TestProcessResources")) {
                 it.dependsOn(input)
                 it.from(input) {
                     it.into("workers")
@@ -94,6 +79,7 @@ class Plugin: Plugin<Project> {
                 workerDir.copyRecursively(bundleDir.dir("workers").asFile, overwrite = true)
             }
         }
+
     }
 
     private fun Project.createJsWorkerConfiguration(

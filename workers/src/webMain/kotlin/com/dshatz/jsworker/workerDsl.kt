@@ -21,10 +21,13 @@ fun worker(block: WorkerScope.() -> Unit) {
 }
 
 class WorkerScope(private val self: DedicatedWorkerGlobalScope) {
-    val workerId = URLSearchParams(self.location.search.toJsString()).get("id") ?: "Unknown worker"
+    val params = URLSearchParams(self.location.search.toJsString())
 
     fun receive(block: suspend (String) -> String) {
+        println("Sending READY!")
+        self.postMessage("READY".toJsString())
         self.onmessage = { messageEvent ->
+            println("Received ${messageEvent.data}")
             GlobalScope.launch {
                 self.postMessage(block(messageEvent.data.toString()).toJsString())
             }

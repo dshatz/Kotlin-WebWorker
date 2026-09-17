@@ -38,8 +38,8 @@ mavenPublishing {
     )
 
     pom {
-        name.set("Kotlin-WebWorker KSP")
-        description.set("KSP Generator for Kotlin-WebWorker.")
+        name.set("Kotlin-WebWorker Plugin")
+        description.set("Gradle plugin for Kotlin-WebWorker.")
         url.set("https://github.com/dshatz/Kotlin-WebWorker")
         inceptionYear.set("2026")
 
