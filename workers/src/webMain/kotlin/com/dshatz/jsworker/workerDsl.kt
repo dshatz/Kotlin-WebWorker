@@ -24,7 +24,6 @@ class WorkerScope(private val self: DedicatedWorkerGlobalScope) {
     val params = URLSearchParams(self.location.search.toJsString())
 
     fun receive(block: suspend (String) -> String) {
-        println("Sending READY!")
         self.postMessage("READY".toJsString())
         self.onmessage = { messageEvent ->
             println("Received ${messageEvent.data}")

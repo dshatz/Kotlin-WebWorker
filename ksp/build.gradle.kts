@@ -22,9 +22,6 @@ kotlin {
             implementation(libs.kotlinpoet.ksp)
         }
     }
-    compilerOptions {
-        freeCompilerArgs.add("-Xcontext-parameters")
-    }
 }
 
 tasks.withType<Test>().configureEach {

@@ -44,25 +44,13 @@ fun createWorkerFromModule(scriptURL: String): CompletableDeferred<Worker> {
     }
     return result
 }
-/*external open class Worker(
-    url: String,
-    options: WorkerOptions = definedExternally
-): EventTarget,
-    AbstractWorker {
-    var onmessageerror: ((Event) -> Unit)?
-    override var onerror: ((Event) -> Unit)?
-    fun terminate()
-    fun postMessage(message: JsAny?, transfer: JsAny = definedExternally)
-}*/
 
 val workerScope = CoroutineScope(Dispatchers.Default)
 
 inline fun <reified T, reified R> Worker.sendIgnoreResult(data: T) {
     workerScope.launch {
         try {
-            println("sendIgnoreResult")
             val result: R = send<T, R>(data)
-            println("Ignoring result $result")
         } catch (e: Throwable) {
             println("Error in sendIgnoreResult: ${e.message}")
         }
@@ -71,7 +59,6 @@ inline fun <reified T, reified R> Worker.sendIgnoreResult(data: T) {
 
 inline suspend fun <reified T, reified R> Worker.send(data: T): R = suspendCancellableCoroutine<R> { continuation ->
     val callId = callCounter.incrementAndFetch()
-    println("Making call callId = $callId, data = $data")
     val listener = { event: Event ->
         if (event is MessageEvent) {
             val responseText = (event.data as JsString).toString()
@@ -91,14 +78,12 @@ inline suspend fun <reified T, reified R> Worker.send(data: T): R = suspendCance
     continuation.invokeOnCancellation {
         removeEventListener("message", listener)
     }
-    println("Serializing message $data")
     val message = workerJson.encodeToString<WorkerRequest<T>>(
         WorkerRequest(
             callId,
             data
         )
     )
-    println("Sending message $message")
     this.postMessage(message.toJsString())
 }
 
