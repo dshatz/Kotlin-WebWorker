@@ -1,0 +1,33 @@
+[versions]
+kotlin = "2.4.20"
+kotest = "6.1.2"
+kotlinpoet = "2.3.0"
+ksp = "2.3.9"
+publish = "0.36.0"
+testBalloon = "1.2.0-Beta1"
+
+[libraries]
+kotest = { group = "io.kotest", name = "kotest-assertions-core", version.ref = "kotest" }
+kotlin-reflect = { module = "org.jetbrains.kotlin:kotlin-reflect", version.ref = "kotlin" }
+kotlinpoet = { group = "com.squareup", name = "kotlinpoet", version.ref = "kotlinpoet" }
+kotlinpoet-ksp = { group = "com.squareup", name = "kotlinpoet-ksp", version.ref = "kotlinpoet" }
+ksp = { group = "com.google.devtools.ksp", name = "symbol-processing-api", version.ref = "ksp" }
+test = { group = "org.jetbrains.kotlin", name = "kotlin-test", version.ref = "kotlin" }
+coroutines-test = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-test", version = "1.11.0" }
+coroutines-core = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version = "1.11.0" }
+test-core = { module = "de.infix.testBalloon:testBalloon-framework-core", version.ref = "testBalloon" }
+test-kotest = { module = "de.infix.testBalloon:testBalloon-integration-kotest-assertions", version.ref = "testBalloon" }
+browser = { module = "org.jetbrains.kotlinx:kotlinx-browser", version = "0.5.0" }
+serial = { module = "org.jetbrains.kotlinx:kotlinx-serialization-json", version = "1.11.0" }
+self-ksp = { module = "com.dshatz.jsworker:ksp", version = "1.0.0" }
+self-workers = { module = "com.dshatz.jsworker:workers", version = "1.0.0" }
+self-plugin = { module = "com.dshatz.jsworker:plugin", version = "1.0.0" }
+
+[plugins]
+multiplatform = { id = "org.jetbrains.kotlin.multiplatform", version.ref = "kotlin" }
+jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }
+ksp = { id = "com.google.devtools.ksp", version.ref = "ksp" }
+publish = { id = "com.vanniktech.maven.publish", version.ref = "publish" }
+dokka = { id = "org.jetbrains.dokka", version = "2.1.0" }
+test = { id = "de.infix.testBalloon", version.ref = "testBalloon" }
+serial = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlin" }
