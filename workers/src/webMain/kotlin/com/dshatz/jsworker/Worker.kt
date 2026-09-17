@@ -11,23 +11,19 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.decodeFromJsonElement
-import org.w3c.dom.AbstractWorker
 import org.w3c.dom.ErrorEvent
 import org.w3c.dom.MODULE
 import org.w3c.dom.MessageEvent
+import org.w3c.dom.Worker
 import org.w3c.dom.WorkerOptions
 import org.w3c.dom.WorkerType
 import org.w3c.dom.events.Event
-import org.w3c.dom.events.EventListener
-import org.w3c.dom.events.EventTarget
 import kotlin.concurrent.atomics.ExperimentalAtomicApi
 import kotlin.concurrent.atomics.incrementAndFetch
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
 import kotlin.js.ExperimentalWasmJsInterop
-import kotlin.js.JsAny
 import kotlin.js.JsString
-import kotlin.js.definedExternally
 import kotlin.js.toJsString
 import kotlin.js.unsafeCast
 
@@ -48,16 +44,16 @@ fun createWorkerFromModule(scriptURL: String): CompletableDeferred<Worker> {
     }
     return result
 }
-public external open class Worker(
-    scriptURL: String,
+/*external open class Worker(
+    url: String,
     options: WorkerOptions = definedExternally
-) : EventTarget,
+): EventTarget,
     AbstractWorker {
     var onmessageerror: ((Event) -> Unit)?
     override var onerror: ((Event) -> Unit)?
     fun terminate()
     fun postMessage(message: JsAny?, transfer: JsAny = definedExternally)
-}
+}*/
 
 val workerScope = CoroutineScope(Dispatchers.Default)
 
@@ -91,9 +87,6 @@ inline suspend fun <reified T, reified R> Worker.send(data: T): R = suspendCance
     addEventListener("message", listener)
     this.onerror = { event ->
         continuation.resumeWithException(RuntimeException("onerror: " + event.unsafeCast<ErrorEvent>().message))
-    }
-    this.onmessageerror = { event ->
-        continuation.resumeWithException(RuntimeException("onmessageerror: " + event.unsafeCast<ErrorEvent>().message))
     }
     continuation.invokeOnCancellation {
         removeEventListener("message", listener)

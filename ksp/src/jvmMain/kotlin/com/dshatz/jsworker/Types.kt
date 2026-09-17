@@ -20,6 +20,6 @@ object Types {
 
     val WorkerRequest = ClassName(pkg, "WorkerRequest")
     val WorkerResponse = ClassName(pkg, "WorkerResponse")
-    val Worker = ClassName(pkg, "Worker")
+    val Worker = ClassName("org.w3c.dom", "Worker")
     val CompletableDeferred = ClassName("kotlinx.coroutines", "CompletableDeferred")
 }

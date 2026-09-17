@@ -38,6 +38,9 @@ kotlin {
             api(libs.serial)
         }
     }
+    compilerOptions {
+        freeCompilerArgs.add("-Xexpect-actual-classes")
+    }
 }
 
 mavenPublishing {
