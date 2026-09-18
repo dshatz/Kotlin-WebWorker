@@ -22,6 +22,10 @@ gradlePlugin {
     }
 }
 
+kotlin {
+    jvmToolchain(21)
+}
+
 dependencies {
     implementation("org.jetbrains.kotlin:kotlin-gradle-plugin:${libs.versions.kotlin.get()}")
     implementation("com.google.devtools.ksp:com.google.devtools.ksp.gradle.plugin:${libs.versions.ksp.get()}")

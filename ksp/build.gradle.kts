@@ -13,6 +13,7 @@ version = libVersion
 group = libGroup
 
 kotlin {
+    jvmToolchain(21)
     jvm()
 
     sourceSets {
