@@ -30,6 +30,9 @@ kotlin {
         webMain.dependencies {
             implementation(project(":workers"))
         }
+        /*jsMain.configure {
+            resources.srcDir(project.layout.buildDirectory.dir("generated/ksp/js/jsMain/resources"))
+        }*/
     }
 }
 

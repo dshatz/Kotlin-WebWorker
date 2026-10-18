@@ -30,4 +30,10 @@ class WorkerTest {
         val worker = SampleWorkerWebWorker(100)
         worker.sum(1, 10) shouldBe 111
     }
+
+    @Test
+    fun nonSuspend() = runTest {
+        val worker = SampleWorkerWebWorker()
+        worker.nonSuspendSum(1, 10) shouldBe 11
+    }
 }

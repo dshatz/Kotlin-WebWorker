@@ -1,27 +1,22 @@
 package com.dshatz.jsworker
 
+import com.google.devtools.ksp.gradle.KspAATask
 import com.google.devtools.ksp.gradle.KspExtension
 import org.gradle.api.Plugin
 import org.gradle.api.Project
 import org.gradle.api.artifacts.Configuration
 import org.gradle.api.attributes.Category
 import org.gradle.api.attributes.Usage
+import org.gradle.api.file.DuplicatesStrategy
 import org.gradle.api.internal.file.DefaultFilePropertyFactory
 import org.gradle.api.provider.Provider
 import org.gradle.api.tasks.Copy
-import org.gradle.api.tasks.Sync
 import org.gradle.language.jvm.tasks.ProcessResources
 import org.jetbrains.kotlin.gradle.dsl.KotlinMultiplatformExtension
-import org.jetbrains.kotlin.gradle.dsl.kotlinExtension
 import org.jetbrains.kotlin.gradle.plugin.KotlinPlatformType
 import org.jetbrains.kotlin.gradle.plugin.KotlinTarget
 import org.jetbrains.kotlin.gradle.targets.js.KotlinWasmTargetAttribute
 import org.jetbrains.kotlin.gradle.targets.js.dsl.KotlinJsTargetDsl
-import org.jetbrains.kotlin.gradle.targets.js.ir.DefaultIncrementalSyncTask
-import org.jetbrains.kotlin.gradle.targets.js.testing.KotlinJsTest
-import org.jetbrains.kotlin.gradle.tasks.IncrementalSyncTask
-import java.io.File
-import kotlin.jvm.java
 
 class Plugin: Plugin<Project> {
 
@@ -60,7 +55,7 @@ class Plugin: Plugin<Project> {
 
         // 1. Add to executable resources.
         tasks.withType(ProcessResources::class.java).configureEach {
-            if (it.name in setOf("${target}ProcessResources", "${target}TestProcessResources")) {
+            if (it.name in setOf("${target}ProcessResources", /*"${target}TestProcessResources"*/)) {
                 it.dependsOn(input)
                 it.from(input) {
                     it.into("workers")
@@ -68,7 +63,7 @@ class Plugin: Plugin<Project> {
             }
         }
 
-        // 2. Add to test webpack root.
+        // 2. Add to test webpack root (kotlin 2.4.20+ new test DSL).
         tasks.matching {
             it.name == "prepareWebpackBundleForKotlin${target.capitalize()}Tests"
         }.configureEach {
@@ -141,22 +136,37 @@ fun KotlinTarget.addOutgoingWorker(
     project.pluginManager.withPlugin("com.google.devtools.ksp") {
         val ksp = project.extensions.getByType(KspExtension::class.java)
 
+        val kspTask = project.tasks.matching {
+            it.name == "kspKotlin${targetName.capitalize()}"
+        }.withType(KspAATask::class.java)
+
         val outputJsFileName = outputModuleName.map { "$it.js" }
         ksp.arg("_jsworker_filename", outputJsFileName)
 
         val distTaskName = "${name}BrowserDistribution"
+        val libDistTaskName = "${name}BrowserLibraryDistribution"
 
         val copyTaskName = "copyWorkerDistribution${name.capitalize()}"
         val copyTask = project.tasks.register(copyTaskName, Copy::class.java) {
             it.destinationDir = project.layout.buildDirectory.dir("workerDistribution${name.capitalize()}").get().asFile
-            it.rename {
-                if (it.endsWith(".js")) outputJsFileName.get()
-                else null
+            val distTasks = project.tasks.named {
+                it == distTaskName || it == libDistTaskName
             }
-            val distTask = project.tasks.named(distTaskName)
-            it.from(distTask)
-            it.dependsOn(distTask)
+            it.from(distTasks) {
+                /*it.rename {
+                    project.logger.warn("File $it, outputModuleName: ${outputModuleName.get()}")
+                    project.logger.warn("Renaming $it -> ${outputJsFileName.get()}")
+                    if (it.endsWith(".js")) outputJsFileName.get()
+                    else null
+                }*/
+            }
+            it.duplicatesStrategy = DuplicatesStrategy.WARN
+
+            it.dependsOn(kspTask)
+            it.dependsOn(distTasks)
+            it.from(kspTask.map { it.kspConfig.resourceOutputDir.asFile })
         }
+
 
         val output = project.configurations.getByName("${name}WorkerOutput")
         project.artifacts {

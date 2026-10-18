@@ -4,13 +4,23 @@ import io.kotest.matchers.shouldBe
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.test.runTest
+import org.khronos.webgl.Int8Array
+import kotlin.coroutines.suspendCoroutine
+import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.time.Duration.Companion.minutes
 
 class WorkerTest {
+    @Test
+    fun simple() = runTest {
+        val worker = SampleWorkerWebWorker()
+        val sum = worker.sum(1, 10)
+        sum shouldBe 11
+    }
+
     @OptIn(ExperimentalWasmJsInterop::class)
     @Test
-    fun simple() = runTest(timeout = 10.minutes) {
+    fun concurrent() = runTest(timeout = 10.minutes) {
         val worker = SampleWorkerWebWorker()
 
         val results = (1..10).map {
@@ -31,4 +41,35 @@ class WorkerTest {
         val worker = SampleWorkerWebWorker(100)
         worker.sum(1, 10) shouldBe 111
     }
+
+    @Test
+    fun bytes() = runTest {
+        val worker = SampleWorkerWebWorker()
+        val bytes = Random.nextBytes(10)
+        worker.bytes(bytes) shouldBe bytes
+    }
+
+    @Test
+    fun transfer() = runTest {
+        val worker = SampleWorkerWebWorker()
+        val arr = Int8Array(5)
+        arr.byteLength shouldBe 5
+        worker.buffer(arr) shouldBe 5
+        arr.byteLength shouldBe 0
+        isBufferDetached(arr.buffer) shouldBe true
+    }
+
+    @Test
+    fun transferBack() = runTest {
+        val worker = SampleWorkerWebWorker()
+        val arr = Int8Array(100)
+        arr.byteLength shouldBe 100
+        worker.transferOwnershipBack(arr) shouldBe 100
+        arr.byteLength shouldBe 100
+        isBufferDetached(arr.buffer) shouldBe false
+        suspendCoroutine {  }
+    }
 }
+
+@JsFun("(buffer) => buffer.detached")
+private external fun isBufferDetached(buffer: JsAny): Boolean

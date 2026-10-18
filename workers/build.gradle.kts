@@ -27,7 +27,13 @@ kotlin {
         nodejs()
     }
     wasmJs() {
-        browser()
+        browser {
+            testTask {
+                useKarma {
+                    useFirefox()
+                }
+            }
+        }
         nodejs()
     }
 
@@ -36,6 +42,10 @@ kotlin {
             api(libs.browser)
             api(libs.coroutines.core)
             api(libs.serial)
+        }
+        webTest.dependencies {
+            implementation(kotlin("test"))
+            implementation(libs.kotest)
         }
     }
 }

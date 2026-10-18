@@ -8,6 +8,9 @@ data class WorkerDesc(
     val proxyClass: ClassName = cls.withSuffix("WebWorker"),
     val workerFileName: String,
     val functions: List<WorkerFun>,
-    val constructors: List<WorkerFun>
-)
+    val constructors: List<WorkerFun>,
+    val dependencyModules: List<String>
+) {
+    val entrypointFileName: String = "${cls.simpleName}_entrypoint"
+}
 

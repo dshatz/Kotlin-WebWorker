@@ -8,7 +8,8 @@ data class WorkerFun(
     val name: String,
     val parameters: List<ParamInfo>,
     val returnType: TypeName,
-    val reqClassName: ClassName
+    val reqClassName: ClassName,
+    val respClassName: ClassName
 ) {
     fun constructorBuilder(): FunSpec.Builder {
         return FunSpec.constructorBuilder()

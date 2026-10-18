@@ -12,9 +12,10 @@ import com.google.devtools.ksp.processing.Resolver
 import com.google.devtools.ksp.processing.SymbolProcessor
 import com.google.devtools.ksp.processing.SymbolProcessorEnvironment
 import com.google.devtools.ksp.processing.SymbolProcessorProvider
+import com.google.devtools.ksp.symbol.ClassKind
 import com.google.devtools.ksp.symbol.KSAnnotated
 import com.google.devtools.ksp.symbol.KSClassDeclaration
-import com.google.devtools.ksp.symbol.Modifier
+import com.squareup.kotlinpoet.ANY
 import com.squareup.kotlinpoet.ClassName
 import com.squareup.kotlinpoet.CodeBlock
 import com.squareup.kotlinpoet.FileSpec
@@ -54,6 +55,7 @@ class JSWorkerProcessorProvider : SymbolProcessorProvider {
             workers.flatMap {
                 listOf(
                     generateRequests(it),
+                    generateResponses(it),
                     generateJsReceiverCode(it),
                     generateProxy(it)
                 )
@@ -61,7 +63,54 @@ class JSWorkerProcessorProvider : SymbolProcessorProvider {
                 it.writeTo(codeGenerator, deps)
             }
 
+            workers.map {
+                it to generateJSEntrypoint(it)
+            }.forEach { (worker, script) ->
+                codeGenerator.createNewFileByPath(
+                    deps,
+                    worker.entrypointFileName,
+                    extensionName = "js"
+                ).use {
+                    it.write(script.encodeToByteArray())
+                }
+            }
+
             return emptyList()
+        }
+
+        private fun generateJSEntrypoint(worker: WorkerDesc): String {
+            val depPromises = worker.dependencyModules.associateWith {
+                it.replace(".", "").replace("/", "")
+            }
+            return """
+                // Entrypoint for ${worker.cls.canonicalName}.
+                if (typeof document === 'undefined') {
+                    globalThis.document = {
+                        baseURI: self.location.href
+                    };
+                }
+                ${depPromises.entries.joinToString("\n") { (module, promise) ->
+                    """
+                        let $promise = new Promise((resolve, reject) => {
+                            try {
+                                self.Module = self.Module || {};
+                                self.Module.onRuntimeInitialized = () => {
+                                  resolve(self.Module);
+                                };
+                                self.importScripts("./$module")
+                            } catch (e) {
+                                reject(e);
+                            }
+                        })
+                    """.trimIndent()
+                }}
+                Promise.all([${depPromises.values.joinToString()}]).then(() => {
+                    console.log("All dependency modules resolved")
+                    import("./${worker.workerFileName}")
+                }).catch(err => {
+                     console.error("Failed to load worker dependencies:", err);
+                });
+            """.trimIndent()
         }
 
         private fun generateProxy(worker: WorkerDesc): FileSpec {
@@ -70,7 +119,7 @@ class JSWorkerProcessorProvider : SymbolProcessorProvider {
             val type = TypeSpec.classBuilder(proxyCls)
                 .addProperty(
                     PropertySpec.builder("worker", Types.CompletableDeferred.parameterizedBy(Types.Worker))
-                        .initializer("%M(%S)", Types.Members.createWorkerFromModule, "workers/${worker.workerFileName}")
+                        .initializer("%M(%S)", Types.Members.createWorkerFromModule, "workers/${worker.entrypointFileName}.js")
                         .build()
                 )
                 .addProperty(
@@ -91,7 +140,19 @@ class JSWorkerProcessorProvider : SymbolProcessorProvider {
                     })
                 }
                 spec.returns(f.returnType)
-                    .addStatement("return readyWorker.await().%M<%T, %T>(%L)", Types.Members.send, worker.cls.reqSealedClass(), f.returnType, createReq)
+//                    .addStatement("val transferable = listOf<%T>(%L).mapNotNull { %M(it) }", Types.JsAny, paramList, Types.Members.transferableOrNull)
+                    .addStatement("val result: %T = readyWorker.await().%M<%T, %T, %T>(%L)",
+                        f.returnType,
+                        send,
+                        worker.cls.reqSealedClass(),
+                        f.respClassName,
+                        f.returnType,
+                        createReq
+                    )
+                    .addStatement(
+                        "return result",
+                        f.returnType
+                    )
                 spec.build()
             }
 
@@ -110,9 +171,10 @@ class JSWorkerProcessorProvider : SymbolProcessorProvider {
                         .beginControlFlow("if (it == null)")
                         .addStatement("val w = worker.getCompleted()")
                         .addStatement(
-                            "w.%M<%T, %T>(%L)",
+                            "w.%M<%T, %T, %T>(%L)",
                             Types.Members.sendIgnoreResult,
                             worker.cls.reqSealedClass(),
+                            c.respClassName,
                             c.returnType,
                             createReq
                         )
@@ -127,6 +189,7 @@ class JSWorkerProcessorProvider : SymbolProcessorProvider {
             type.addFunctions(funSpecs)
             type.addFunctions(constructorSpecs)
             f.addType(type.build())
+            f.addAnnotation(Types.Annotations.optIn(Types.Annotations.ExperimentalWasmInterop))
             return f.build()
         }
 
@@ -136,42 +199,56 @@ class JSWorkerProcessorProvider : SymbolProcessorProvider {
             val f = FileSpec.builder(receiverCls)
             val code = CodeBlock.builder()
                 .beginControlFlow("%M", Types.Members.worker)
-                .addStatement("val json = kotlinx.serialization.json.Json")
                 .addStatement("val worker: %T = %T()", Types.CompletableDeferred.parameterizedBy(cls), Types.CompletableDeferred)
                 .beginControlFlow("receive")
-                .addStatement("val req = json.decodeFromString<%T<%T>>(it)", Types.WorkerRequest, cls.reqSealedClass())
-                .addStatement("val reqData = req.request")
+                .addStatement("val (data, callId) = it")
+                .addStatement("val reqData = %M<%T>(data)", Types.Members.decodeFromJsObject, cls.reqSealedClass())
                 .beginControlFlow("val result = when (reqData)")
                 .apply {
                     worker.functions.forEach { f ->
                         val paramCodes = f.parameters.joinToCode {
                             CodeBlock.of("reqData.%N", it.name)
                         }
-                        addStatement("""
+                        addStatement(
+                            """
                             is %T -> { 
-                                json.encodeToString(%T(req.callId, worker.await().%L(%L))) 
+                                val rawResult = worker.await().%L(%L)
+                                %M(%T(rawResult)) 
                             }
-                            """.trimIndent(), f.reqClassName, Types.WorkerResponse, f.name, paramCodes)
+                            """.trimIndent(),
+                            f.reqClassName,
+                            f.name,
+                            paramCodes,
+                            Types.Members.encodeToJsObject,
+                            f.respClassName
+                        )
                     }
                     worker.constructors.forEach { c ->
                         val paramCodes = c.parameters.joinToCode {
                             CodeBlock.of("reqData.%N", it.name)
                         }
-                        addStatement("""
+                        addStatement(
+                            """
                             is %T -> { 
                                 worker.complete(%T(%L))
-                                json.encodeToString(%T(req.callId, Unit))
+                                %M(Unit)
                             }
-                        """.trimIndent(), c.reqClassName, cls, paramCodes, Types.WorkerResponse)
+                        """.trimIndent(),
+                            c.reqClassName,
+                            cls,
+                            paramCodes,
+                            Types.Members.encodeToJsObject
+                        )
                     }
                 }
                 .endControlFlow()
-                .addStatement("result")
+                .addStatement("result to callId")
                 .endControlFlow()
                 .endControlFlow()
                 .build()
             f.addFunction(FunSpec.builder("main")
                 .addCode(code)
+                .addAnnotation(Types.Annotations.optIn(Types.Annotations.ExperimentalWasmInterop))
                 .build()
             )
             return f.build()
@@ -181,18 +258,37 @@ class JSWorkerProcessorProvider : SymbolProcessorProvider {
             return withSuffix("Request")
         }
 
+        private fun ClassName.respSealedClass(): ClassName {
+            return withSuffix("Response")
+        }
+
         private fun collectWorkers(workerFileName: String, declarations: Sequence<KSClassDeclaration>): Sequence<WorkerDesc> {
             return declarations.map { decl ->
                 val cls = decl.toClassName()
-                val sealed = cls.reqSealedClass()
-                val funs = decl.getDeclaredFunctions().filterNot { it.isConstructor() }
-                    .filter { Modifier.SUSPEND in it.modifiers }
+                val sealedReq = cls.reqSealedClass()
+                val sealedResp = cls.respSealedClass()
+                val annotation = decl.annotations.firstOrNull {
+                    it.annotationType.resolve().declaration.qualifiedName?.asString() == Types.Annotations.JsWorker.canonicalName
+                } ?: error("No JsWorker annotation found")
+                val dependencyModules = annotation
+                    .arguments.firstOrNull { it.name?.asString() == "dependencyModules" }
+                    ?.value as? List<String> ?: error("No dependencyModules arg found. Args: ${annotation.arguments.joinToString { it.name?.asString().toString() }}")
+                val jsNameFromAnnotation = annotation.arguments.first { it.name?.asString() == "jsFileName" }.value as String
+                val jsName = jsNameFromAnnotation.takeUnless { it.isEmpty() } ?: workerFileName
+                val funs = decl.getAllFunctions().filterNot { it.isConstructor() }
+                    .filter { (it.parent as? KSClassDeclaration)?.toClassName() != ANY }
+                    .filterNot {
+                        it.annotations.any {
+                            it.annotationType.resolve().toClassName() == Types.Annotations.JsWorkerIgnore
+                        }
+                    }
                     .map { f ->
                         WorkerFun(
                             f.simpleName.asString(),
                             parameters = f.parameters.toParamList(),
                             returnType = f.returnType!!.toTypeName(),
-                            reqClassName = sealed.nestedClass(f.simpleName.asString().uppercase())
+                            reqClassName = sealedReq.nestedClass(f.simpleName.asString().capitalize()),
+                            respClassName = sealedResp.nestedClass(f.simpleName.asString().capitalize())
                         )
                     }
 
@@ -202,14 +298,16 @@ class JSWorkerProcessorProvider : SymbolProcessorProvider {
                             "init$idx",
                             parameters = f.parameters.toParamList(),
                             returnType = UNIT,
-                            reqClassName = sealed.nestedClass("Init$idx")
+                            reqClassName = sealedReq.nestedClass("Init$idx"),
+                            respClassName = sealedResp.nestedClass("Init$idx")
                         )
-                    }
+                    }.takeUnless { decl.classKind == ClassKind.OBJECT }
                 WorkerDesc(
                     cls,
-                    workerFileName = workerFileName,
+                    workerFileName = jsName,
                     functions = funs.toList(),
-                    constructors = constructors.toList()
+                    constructors = constructors.orEmpty().toList(),
+                    dependencyModules = dependencyModules
                 )
             }
         }
@@ -235,6 +333,25 @@ class JSWorkerProcessorProvider : SymbolProcessorProvider {
                 .addModifiers(KModifier.SEALED)
                 .addTypes(funSpecs)
                 .addTypes(constructorSpecs)
+                .build()
+            return FileSpec.builder(sealedCls)
+                .addType(sealed)
+                .build()
+        }
+
+        private fun generateResponses(worker: WorkerDesc): FileSpec {
+            val sealedCls = worker.cls.respSealedClass()
+            val funSpecs = (worker.functions + worker.constructors).map { f ->
+                buildDataClassOrObject(f.respClassName, listOf(ParamInfo("value", f.returnType)), override = setOf("value"))
+                    .addAnnotation(Types.Annotations.Serializable)
+                    .superclass(sealedCls)
+                    .addSuperinterface(Types.CallResponse.parameterizedBy(f.returnType))
+                    .build()
+            }
+            val sealed = TypeSpec.classBuilder(sealedCls)
+                .addAnnotation(Types.Annotations.Serializable)
+                .addModifiers(KModifier.SEALED)
+                .addTypes(funSpecs)
                 .build()
             return FileSpec.builder(sealedCls)
                 .addType(sealed)
