@@ -357,11 +357,12 @@ class JSWorkerProcessorProvider : SymbolProcessorProvider {
                     .addSuperinterface(Types.CallResponse.parameterizedBy(f.returnType))
 
                 if (f.transferReturn) {
+                    val transfer = if (f.returnType == Types.ArrayBuffer) "value" else "value.buffer"
                     builder.addSuperinterface(Types.TransferableResponse)
                     builder.addProperty(
                         PropertySpec.builder("transferObj", Types.JsAny)
                             .addModifiers(KModifier.OVERRIDE)
-                            .getter(FunSpec.getterBuilder().addCode("return value.buffer").build())
+                            .getter(FunSpec.getterBuilder().addCode("return $transfer").build())
                             .build()
                     )
                 }

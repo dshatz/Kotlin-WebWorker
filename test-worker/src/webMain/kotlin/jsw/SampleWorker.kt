@@ -2,7 +2,9 @@ package jsw
 
 import com.dshatz.jsworker.JSWorker
 import com.dshatz.jsworker.TransferOwnership
+import org.khronos.webgl.ArrayBuffer
 import org.khronos.webgl.Int8Array
+import org.khronos.webgl.set
 
 @JSWorker(jsFileName = "test-worker.js", "pdfium.js")
 class SampleWorker {
@@ -29,7 +31,7 @@ class SampleWorker {
         return arr
     }
 
-    fun buffer(@TransferOwnership arr: Int8Array): Int {
+    fun array(@TransferOwnership arr: Int8Array): Int {
         if (arr.byteLength == 0) error("Received arr is not transferred to webworker.")
         return arr.length
     }
@@ -37,5 +39,13 @@ class SampleWorker {
     @TransferOwnership
     fun subArrayZeroCopy(@TransferOwnership arr: Int8Array, length: Int): Int8Array {
         return arr.subarray(0, length)
+    }
+
+    @TransferOwnership
+    fun buffer(@TransferOwnership buffer: ArrayBuffer): ArrayBuffer {
+        println("Worker received buffer of length ${buffer.byteLength}")
+        val arr = Int8Array(buffer, 0, 100)
+        arr[0] = 42
+        return buffer
     }
 }

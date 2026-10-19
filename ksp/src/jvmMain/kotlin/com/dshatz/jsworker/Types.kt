@@ -39,4 +39,6 @@ object Types {
 
     val JsAny = ClassName("kotlin.js", "JsAny")
 
+    val ArrayBuffer = ClassName("org.khronos.webgl", "ArrayBuffer")
+
 }

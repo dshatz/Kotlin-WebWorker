@@ -27,7 +27,8 @@ data class WorkerFun(
 
     fun paramTransferArray(): CodeBlock {
         val values = parameters.filter { it.transfer }.joinToCode {
-            CodeBlock.of("%N.buffer", it.name)
+            if (it.type == Types.ArrayBuffer) CodeBlock.of("%N", it.name)
+            else CodeBlock.of("%N.buffer", it.name)
         }
         return CodeBlock.of("listOf<%T>(%L)", Types.JsAny, values)
     }

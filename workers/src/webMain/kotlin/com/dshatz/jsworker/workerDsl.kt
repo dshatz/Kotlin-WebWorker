@@ -44,10 +44,10 @@ class WorkerScope(private val self: DedicatedWorkerGlobalScope, private val scop
                     val callId = getPropertyValue(messageEvent.data!!, "callId").toString().toInt()
                     val result = block(jsData to callId)
                     result
-
                 }
                 val (callId, response, transfer) = result.await()
                 val transferArr = listOfNotNull(transfer).toJsArray()
+                println("Transfer arr $transferArr")
                 self.postMessage(makeJsObject(callId, response), transferArr)
             }
         }

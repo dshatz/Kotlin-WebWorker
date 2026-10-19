@@ -55,7 +55,7 @@ class WorkerTest {
         val worker = SampleWorkerWebWorker()
         val arr = Int8Array(5)
         arr.byteLength shouldBe 5
-        worker.buffer(arr) shouldBe 5
+        worker.array(arr) shouldBe 5
         arr.byteLength shouldBe 0
         isBufferDetached(arr.buffer) shouldBe true
     }
@@ -77,7 +77,6 @@ class WorkerTest {
 
         isSameBufferReference(oldBuffer, newArrSameBuffer.buffer)
     }
-
 }
 
 @JsFun("(a, b) => a === b")

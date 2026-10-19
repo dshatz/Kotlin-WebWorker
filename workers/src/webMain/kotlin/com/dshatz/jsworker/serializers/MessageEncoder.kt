@@ -224,15 +224,21 @@ class MessageEncoder(
             is Char -> return value.toString().toJsString()
         }
 
-        return if (value as? ArrayBufferView != null) {
-            cloneToPureJs(value)
-        } else {
-            value.toJsReference()
-        }
+        return cloneToPureJs(value as JsAny)
     }
 }
 
-@JsFun("(arr) => new arr.constructor(arr)")
+@JsFun("""
+    (arr) => {
+        if (arr instanceof ArrayBuffer) {
+            return arr;
+        } else if (ArrayBuffer.isView(arr)) {
+            return new arr.constructor(arr);
+        } else {
+            return arr;
+        }
+    }
+""")
 private external fun cloneToPureJs(arr: JsAny): JsAny
 
 @JsFun("() => ([])")

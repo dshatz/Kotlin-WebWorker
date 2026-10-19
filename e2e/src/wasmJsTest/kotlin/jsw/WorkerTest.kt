@@ -6,6 +6,7 @@ import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.test.runTest
 import org.khronos.webgl.ArrayBuffer
 import org.khronos.webgl.Int8Array
+import org.khronos.webgl.get
 import kotlin.coroutines.suspendCoroutine
 import kotlin.random.Random
 import kotlin.test.Test
@@ -55,7 +56,7 @@ class WorkerTest {
         val worker = SampleWorkerWebWorker()
         val arr = Int8Array(5)
         arr.byteLength shouldBe 5
-        worker.buffer(arr) shouldBe 5
+        worker.array(arr) shouldBe 5
         arr.byteLength shouldBe 0
         isBufferDetached(arr.buffer) shouldBe true
     }
@@ -76,6 +77,24 @@ class WorkerTest {
         newArrSameBuffer.byteLength shouldBe 10
 
         isSameBufferReference(oldBuffer, newArrSameBuffer.buffer)
+    }
+
+    @Test
+    fun transferBuffer() = runTest {
+        val size = 1024*1024
+        val worker = SampleWorkerWebWorker()
+        val buffer = ArrayBuffer(size)
+        val returnedBuffer = worker.buffer(buffer)
+        isSameBufferReference(buffer, returnedBuffer)
+
+        buffer.byteLength shouldBe 0
+        isBufferDetached(buffer) shouldBe true
+
+        returnedBuffer.byteLength shouldBe size
+        isBufferDetached(returnedBuffer) shouldBe false
+
+        val arr = Int8Array(returnedBuffer, 0, 100)
+        arr[0] shouldBe 42
     }
 
 }
