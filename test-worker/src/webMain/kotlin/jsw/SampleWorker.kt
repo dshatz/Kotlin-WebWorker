@@ -35,7 +35,7 @@ class SampleWorker {
     }
 
     @TransferOwnership
-    fun transferOwnershipBack(@TransferOwnership arr: Int8Array): Int8Array {
-        return arr.subarray(0, 10)
+    fun subArrayZeroCopy(@TransferOwnership arr: Int8Array, length: Int): Int8Array {
+        return arr.subarray(0, length)
     }
 }

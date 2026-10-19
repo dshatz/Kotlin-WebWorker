@@ -1,5 +1,3 @@
-@file:OptIn(ExperimentalWasmJsInterop::class)
-
 package com.dshatz.jsworker
 
 import com.dshatz.jsworker.jstools.asJsObject
@@ -14,6 +12,7 @@ import org.w3c.dom.url.URLSearchParams
 import kotlin.js.ExperimentalWasmJsInterop
 import kotlin.js.JsAny
 import kotlin.js.js
+import kotlin.js.toJsArray
 import kotlin.js.toJsString
 
 external val self: DedicatedWorkerGlobalScope
@@ -35,30 +34,26 @@ fun worker(block: suspend WorkerScope.() -> Unit) {
 class WorkerScope(private val self: DedicatedWorkerGlobalScope, private val scope: CoroutineScope) {
     val params = URLSearchParams(self.location.search.toJsString())
 
-    fun receive(block: suspend (Pair<JsAny, Int>) -> Pair<JsAny, Int>) {
+    fun receive(block: suspend (Pair<JsAny, Int>) -> WebWorkerResponse) {
         self.postMessage("READY".toJsString())
         self.onmessage = { messageEvent ->
             scope.launch {
                 val result = async {
-                    println("Request ${stringify(messageEvent.data)}")
                     val obj = messageEvent.data?.asJsObject() ?: error("No message data received.")
                     val jsData = obj["data"] ?: emptyJsObject()
                     val callId = getPropertyValue(messageEvent.data!!, "callId").toString().toInt()
                     val result = block(jsData to callId)
-                    println("Response (${result.second}) ${result.first.asJsObject()}")
                     result
 
                 }
-                val (response, callId) = result.await()
-                self.postMessage(makeJsObject(callId, response).also {
-                    println("Sending ${stringify(it)}")
-                })
+                val (callId, response, transfer) = result.await()
+                val transferArr = listOfNotNull(transfer).toJsArray()
+                self.postMessage(makeJsObject(callId, response), transferArr)
             }
         }
     }
 }
 
-@JsFun("(obj) => JSON.stringify(obj)")
-private external fun stringify(obj: JsAny?): String
+data class WebWorkerResponse(val callId: Int, val data: JsAny, val transfer: JsAny?)
 
 fun emptyJsObject(): JsAny = js("({})")

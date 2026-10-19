@@ -26,11 +26,6 @@ object Types {
         val send = MemberName(pkg, "send")
         val sendIgnoreResult = MemberName(pkg, "sendIgnoreResult")
         val createWorkerFromModule = MemberName(pkg, "createWorkerFromModule")
-
-        val importModule = MemberName(pkg, "importModule")
-        val await = MemberName("kotlinx.coroutines", "await")
-        val transferableOrNull = MemberName(pkg, "transferableOrNull")
-        val workerJson = MemberName(pkg, "workerJson")
         val decodeFromJsObject = MemberName(pkg, "decodeFromJsObject")
         val encodeToJsObject = MemberName(pkg, "encodeToJsObject")
     }
@@ -39,5 +34,9 @@ object Types {
     val CompletableDeferred = ClassName("kotlinx.coroutines", "CompletableDeferred")
 
     val CallResponse = ClassName(pkg, "CallResponse")
+    val TransferableResponse = ClassName(pkg, "TransferableResponse")
+    val WebWorkerResponse = ClassName(pkg, "WebWorkerResponse")
+
+    val JsAny = ClassName("kotlin.js", "JsAny")
 
 }

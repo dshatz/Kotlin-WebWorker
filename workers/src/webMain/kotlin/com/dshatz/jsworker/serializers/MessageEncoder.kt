@@ -3,7 +3,15 @@
 package com.dshatz.jsworker
 
 import com.dshatz.jsworker.jstools.isArrayBuffer
+import com.dshatz.jsworker.serializers.Float32ArraySerializer
+import com.dshatz.jsworker.serializers.Float64ArraySerializer
+import com.dshatz.jsworker.serializers.Int16ArraySerializer
+import com.dshatz.jsworker.serializers.Int32ArraySerializer
 import com.dshatz.jsworker.serializers.Int8ArraySerializer
+import com.dshatz.jsworker.serializers.UInt16ArraySerializer
+import com.dshatz.jsworker.serializers.UInt32ArraySerializer
+import com.dshatz.jsworker.serializers.UInt8ArraySerializer
+import com.dshatz.jsworker.serializers.Uint8ClampedArraySerializer
 import kotlinx.coroutines.NonCancellable.key
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.KSerializer
@@ -20,8 +28,11 @@ import kotlinx.serialization.modules.SerializersModule
 import kotlinx.serialization.modules.contextual
 import kotlinx.serialization.serializer
 import org.khronos.webgl.ArrayBuffer
+import org.khronos.webgl.ArrayBufferView
+import org.khronos.webgl.Int8Array
 import kotlin.js.ExperimentalWasmJsInterop
 import kotlin.js.JsAny
+import kotlin.js.js
 import kotlin.js.toJsReference
 import kotlin.js.toJsString
 import kotlin.js.unsafeCast
@@ -41,7 +52,7 @@ object ArrayBufferSerializer : KSerializer<ArrayBuffer> {
     override fun deserialize(decoder: Decoder): ArrayBuffer {
         if (decoder is MessageDecoder) {
             val value = decoder.currentValue() ?: error("ArrayBuffer value is missing")
-            if (isArrayBuffer(value)) return value.unsafeCast()
+            if (isArrayBuffer(value)) return value.unsafeCast<ArrayBuffer>()
             else error("Value is not an ArrayBuffer: $value")
         }
         error("Unsupported decoder for ArrayBuffer")
@@ -51,6 +62,14 @@ object ArrayBufferSerializer : KSerializer<ArrayBuffer> {
 internal val jsSerialModule: SerializersModule = SerializersModule {
     contextual(ArrayBufferSerializer)
     contextual(Int8ArraySerializer)
+    contextual(UInt8ArraySerializer)
+    contextual(Uint8ClampedArraySerializer)
+    contextual(Int16ArraySerializer)
+    contextual(UInt16ArraySerializer)
+    contextual(Int32ArraySerializer)
+    contextual(UInt32ArraySerializer)
+    contextual(Float32ArraySerializer)
+    contextual(Float64ArraySerializer)
 }
 
 @OptIn(ExperimentalSerializationApi::class)
@@ -90,7 +109,6 @@ class MessageEncoder(
         } else {
             if (currentKey != null) {
                 val key = currentKey!!
-                println("Setting $key = $jsValue")
                 setObjProp(resultObj, key, jsValue)
             }
             currentKey = null
@@ -205,12 +223,17 @@ class MessageEncoder(
             is Short -> return boxInt(value.toInt())
             is Char -> return value.toString().toJsString()
         }
-        return value.toJsReference()
+
+        return if (value as? ArrayBufferView != null) {
+            cloneToPureJs(value)
+        } else {
+            value.toJsReference()
+        }
     }
 }
 
-@Suppress("UNCHECKED_CAST_TO_EXTERNAL_INTERFACE")
-private fun Any.asJsAny(): JsAny? = this as? JsAny
+@JsFun("(arr) => new arr.constructor(arr)")
+private external fun cloneToPureJs(arr: JsAny): JsAny
 
 @JsFun("() => ([])")
 private external fun emptyJsArray(): JsAny

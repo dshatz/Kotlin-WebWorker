@@ -5,6 +5,7 @@ import com.dshatz.jsworker.model.ParamInfo
 import com.dshatz.jsworker.model.WorkerDesc
 import com.dshatz.jsworker.model.WorkerFun
 import com.google.devtools.ksp.getDeclaredFunctions
+import com.google.devtools.ksp.isAnnotationPresent
 import com.google.devtools.ksp.isConstructor
 import com.google.devtools.ksp.processing.CodeGenerator
 import com.google.devtools.ksp.processing.Dependencies
@@ -141,13 +142,14 @@ class JSWorkerProcessorProvider : SymbolProcessorProvider {
                 }
                 spec.returns(f.returnType)
 //                    .addStatement("val transferable = listOf<%T>(%L).mapNotNull { %M(it) }", Types.JsAny, paramList, Types.Members.transferableOrNull)
-                    .addStatement("val result: %T = readyWorker.await().%M<%T, %T, %T>(%L)",
+                    .addStatement("val result: %T = readyWorker.await().%M<%T, %T, %T>(%L, %L)",
                         f.returnType,
                         send,
                         worker.cls.reqSealedClass(),
                         f.respClassName,
                         f.returnType,
-                        createReq
+                        createReq,
+                        f.paramTransferArray()
                     )
                     .addStatement(
                         "return result",
@@ -203,24 +205,29 @@ class JSWorkerProcessorProvider : SymbolProcessorProvider {
                 .beginControlFlow("receive")
                 .addStatement("val (data, callId) = it")
                 .addStatement("val reqData = %M<%T>(data)", Types.Members.decodeFromJsObject, cls.reqSealedClass())
-                .beginControlFlow("val result = when (reqData)")
+                .beginControlFlow("val (result, transfer) = when (reqData)")
                 .apply {
                     worker.functions.forEach { f ->
                         val paramCodes = f.parameters.joinToCode {
                             CodeBlock.of("reqData.%N", it.name)
                         }
+                        val transfer = CodeBlock.of("(wrappedResponse as? %T)?.transferObj",
+                            Types.TransferableResponse
+                        )
                         addStatement(
                             """
                             is %T -> { 
                                 val rawResult = worker.await().%L(%L)
-                                %M(%T(rawResult)) 
+                                val wrappedResponse = %T(rawResult) 
+                                %M(wrappedResponse) to %L  
                             }
                             """.trimIndent(),
                             f.reqClassName,
                             f.name,
                             paramCodes,
+                            f.respClassName,
                             Types.Members.encodeToJsObject,
-                            f.respClassName
+                            transfer
                         )
                     }
                     worker.constructors.forEach { c ->
@@ -231,7 +238,7 @@ class JSWorkerProcessorProvider : SymbolProcessorProvider {
                             """
                             is %T -> { 
                                 worker.complete(%T(%L))
-                                %M(Unit)
+                                %M(Unit) to null
                             }
                         """.trimIndent(),
                             c.reqClassName,
@@ -242,7 +249,7 @@ class JSWorkerProcessorProvider : SymbolProcessorProvider {
                     }
                 }
                 .endControlFlow()
-                .addStatement("result to callId")
+                .addStatement("%T(callId, result, transfer)", Types.WebWorkerResponse)
                 .endControlFlow()
                 .endControlFlow()
                 .build()
@@ -288,7 +295,8 @@ class JSWorkerProcessorProvider : SymbolProcessorProvider {
                             parameters = f.parameters.toParamList(),
                             returnType = f.returnType!!.toTypeName(),
                             reqClassName = sealedReq.nestedClass(f.simpleName.asString().capitalize()),
-                            respClassName = sealedResp.nestedClass(f.simpleName.asString().capitalize())
+                            respClassName = sealedResp.nestedClass(f.simpleName.asString().capitalize()),
+                            transferReturn = f.annotations.any { it.annotationType.toTypeName() == Types.Annotations.TransferOwnership }
                         )
                     }
 
@@ -299,7 +307,8 @@ class JSWorkerProcessorProvider : SymbolProcessorProvider {
                             parameters = f.parameters.toParamList(),
                             returnType = UNIT,
                             reqClassName = sealedReq.nestedClass("Init$idx"),
-                            respClassName = sealedResp.nestedClass("Init$idx")
+                            respClassName = sealedResp.nestedClass("Init$idx"),
+                            transferReturn = false
                         )
                     }.takeUnless { decl.classKind == ClassKind.OBJECT }
                 WorkerDesc(
@@ -342,11 +351,21 @@ class JSWorkerProcessorProvider : SymbolProcessorProvider {
         private fun generateResponses(worker: WorkerDesc): FileSpec {
             val sealedCls = worker.cls.respSealedClass()
             val funSpecs = (worker.functions + worker.constructors).map { f ->
-                buildDataClassOrObject(f.respClassName, listOf(ParamInfo("value", f.returnType)), override = setOf("value"))
+                val builder = buildDataClassOrObject(f.respClassName, listOf(ParamInfo("value", f.returnType, false)), override = setOf("value"))
                     .addAnnotation(Types.Annotations.Serializable)
                     .superclass(sealedCls)
                     .addSuperinterface(Types.CallResponse.parameterizedBy(f.returnType))
-                    .build()
+
+                if (f.transferReturn) {
+                    builder.addSuperinterface(Types.TransferableResponse)
+                    builder.addProperty(
+                        PropertySpec.builder("transferObj", Types.JsAny)
+                            .addModifiers(KModifier.OVERRIDE)
+                            .getter(FunSpec.getterBuilder().addCode("return value.buffer").build())
+                            .build()
+                    )
+                }
+                builder.build()
             }
             val sealed = TypeSpec.classBuilder(sealedCls)
                 .addAnnotation(Types.Annotations.Serializable)

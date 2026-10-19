@@ -48,6 +48,9 @@ kotlin {
             implementation(libs.kotest)
         }
     }
+    compilerOptions {
+        optIn.add("kotlin.js.ExperimentalWasmJsInterop")
+    }
 }
 
 mavenPublishing {

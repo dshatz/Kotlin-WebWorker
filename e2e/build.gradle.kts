@@ -55,6 +55,9 @@ kotlin {
             }
         }
     }
+    compilerOptions {
+        optIn.add("kotlin.js.ExperimentalWasmJsInterop")
+    }
 }
 
 dependencies {

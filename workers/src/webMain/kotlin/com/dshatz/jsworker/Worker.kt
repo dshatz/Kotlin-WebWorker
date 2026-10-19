@@ -3,18 +3,11 @@
 package com.dshatz.jsworker
 
 import com.dshatz.jsworker.jstools.getPropertyValue
-import com.dshatz.jsworker.send
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.suspendCancellableCoroutine
-import kotlinx.serialization.Serializable
-import kotlinx.serialization.decodeFromString
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonElement
-import kotlinx.serialization.json.decodeFromJsonElement
-import org.khronos.webgl.ArrayBuffer
 import org.w3c.dom.ErrorEvent
 import org.w3c.dom.MessageEvent
 import org.w3c.dom.Worker
@@ -27,7 +20,6 @@ import kotlin.coroutines.resumeWithException
 import kotlin.js.ExperimentalWasmJsInterop
 import kotlin.js.JsAny
 import kotlin.js.JsString
-import kotlin.js.js
 import kotlin.js.toJsArray
 import kotlin.js.unsafeCast
 
@@ -73,7 +65,7 @@ suspend inline fun <reified T, reified R: CallResponse<V>, reified V> Worker.sen
                 continuation.resume(response.value)
             }
         } else {
-            println("WARN: Event is $event")
+            println("WARN: Unknown event type: ${event.type}")
         }
     }
     addEventListener("message", listener)
@@ -87,37 +79,13 @@ suspend inline fun <reified T, reified R: CallResponse<V>, reified V> Worker.sen
     this.postMessage(msg, transfer.toJsArray())
 }
 
-@JsFun("(obj) => JSON.stringify(obj, (key, value) => typeof value === 'bigint' ? value.toString() : value)")
-external fun stringifyJs(obj: JsAny?): String
-
-@JsFun("(obj) => typeof obj === 'object' && obj !== null && !('constructor' in obj && obj.constructor.name === 'WasmStructObject') || typeof obj === 'function' || typeof obj === 'symbol'")
-external fun isJsAny(obj: JsAny?): Boolean
-
-@JsFun("(obj) => obj")
-external fun unsafeCastToJsAny(obj: JsAny?): JsAny?
-
-fun transferableOrNull(obj: JsAny): ArrayBuffer? {
-    return toBufferOrNull(obj)
-}
-
 interface CallResponse<T> {
     val value: T
 }
 
-@JsFun("""
-    (obj) => {
-        // If it's already an ArrayBuffer, return it
-        if (obj instanceof ArrayBuffer) {
-            return obj;
-        }
-        // If it's a typed array or DataView (ArrayBufferView), return its buffer
-        if (ArrayBuffer.isView(obj)) {
-            return obj.buffer;
-        }
-        return null;
-    }
-""")
-private external fun toBufferOrNull(obj: JsAny): ArrayBuffer?
+interface TransferableResponse {
+    val transferObj: JsAny
+}
 
 inline fun <reified T> makeMessage(callId: Int, data: T): JsAny {
     val encoded = encodeToJsObject(data)
@@ -128,15 +96,3 @@ inline fun <reified T> makeMessage(callId: Int, data: T): JsAny {
 external fun makeJsObject(callId: Int, data: JsAny): JsAny
 
 val callCounter = AtomicInt(0)
-
-@Serializable
-data class WorkerRequest<T>(
-    val callId: Int,
-    val request: T,
-)
-
-@Serializable
-data class WorkerResponse<R>(
-    val callId: Int,
-    val response: R,
-)

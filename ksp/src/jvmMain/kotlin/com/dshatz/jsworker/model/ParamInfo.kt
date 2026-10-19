@@ -5,7 +5,8 @@ import com.squareup.kotlinpoet.TypeName
 
 data class ParamInfo(
     val name: String,
-    val type: TypeName
+    val type: TypeName,
+    val transfer: Boolean
 ) {
     fun toParameterSpec(): ParameterSpec {
         return ParameterSpec(name, type)

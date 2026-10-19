@@ -4,6 +4,7 @@ import io.kotest.matchers.shouldBe
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.test.runTest
+import org.khronos.webgl.ArrayBuffer
 import org.khronos.webgl.Int8Array
 import kotlin.coroutines.suspendCoroutine
 import kotlin.random.Random
@@ -64,12 +65,23 @@ class WorkerTest {
         val worker = SampleWorkerWebWorker()
         val arr = Int8Array(100)
         arr.byteLength shouldBe 100
-        worker.transferOwnershipBack(arr) shouldBe 100
-        arr.byteLength shouldBe 100
-        isBufferDetached(arr.buffer) shouldBe false
-        suspendCoroutine {  }
+        val oldBuffer = arr.buffer
+
+        val newArrSameBuffer = worker.subArrayZeroCopy(arr, 10)
+
+        isBufferDetached(arr.buffer) shouldBe true
+        arr.byteLength shouldBe 0
+
+        isBufferDetached(newArrSameBuffer.buffer) shouldBe false
+        newArrSameBuffer.byteLength shouldBe 10
+
+        isSameBufferReference(oldBuffer, newArrSameBuffer.buffer)
     }
+
 }
+
+@JsFun("(a, b) => a === b")
+private external fun isSameBufferReference(a: ArrayBuffer, b: ArrayBuffer): Boolean
 
 @JsFun("(buffer) => buffer.detached")
 private external fun isBufferDetached(buffer: JsAny): Boolean

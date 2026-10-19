@@ -13,9 +13,9 @@ import com.squareup.kotlinpoet.ksp.toTypeName
 
 fun List<KSValueParameter>.toParamList(): List<ParamInfo> {
     return map {
-//        val isTransfer = it.annotations.any { it.annotationType.toTypeName() == Types.Annotations.TransferOwnership } || it.type.toTypeName() == ClassName("org.khronos.webgl", "Int8Array")
+        val isTransfer = it.annotations.any { it.annotationType.toTypeName() == Types.Annotations.TransferOwnership }
         val propType = it.type.toTypeName()
-        ParamInfo(it.name!!.asString(), propType)
+        ParamInfo(it.name!!.asString(), propType, transfer = isTransfer)
     }
 }
 
