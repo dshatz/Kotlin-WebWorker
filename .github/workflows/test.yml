@@ -39,7 +39,7 @@ jobs:
         with:
           cache-read-only: false
       - name: Test
-        run: ./gradlew e2e:jsBrowserTest e2e:wasmJsBrowserTest
+        run: ./gradlew e2e:jsBrowserTest e2e:wasmJsBrowserTest workers:jsBrowserTest workers:wasmJsBrowserTest
       - name: Publish Test Report
         id: report
         uses: mikepenz/action-junit-report@v6
