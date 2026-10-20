@@ -58,6 +58,7 @@ inline fun <reified T, reified R: CallResponse<V>, reified V> Worker.sendIgnoreR
 suspend inline fun <reified T, reified R: CallResponse<V>, reified V> Worker.send(data: T, transfer: List<JsAny> = emptyList()): V = suspendCancellableCoroutine<V> { continuation ->
     val callId = callCounter.incrementAndFetch()
     lateinit var listener: (Event) -> Unit
+    lateinit var errorListener: (Event) -> Unit
     listener = { event: Event ->
         if (event is MessageEvent) {
             val obj = event.data ?: emptyJsObject()
@@ -65,6 +66,7 @@ suspend inline fun <reified T, reified R: CallResponse<V>, reified V> Worker.sen
             val responseJs = getPropertyValue(obj, "data") ?: error("no data key in message: $obj")
             if (responseCallId == callId) {
                 removeEventListener("message", listener)
+                removeEventListener("error", errorListener)
                 val response = decodeFromJsObject<R>(responseJs)
                 continuation.resume(response.value)
             }
@@ -73,14 +75,14 @@ suspend inline fun <reified T, reified R: CallResponse<V>, reified V> Worker.sen
         }
     }
     addEventListener("message", listener)
-    lateinit var errorListener: (Event) -> Unit
     errorListener = { event ->
+        removeEventListener("message", listener)
         removeEventListener("error", errorListener)
         continuation.resumeWithException(RuntimeException("onerror: " + event.unsafeCast<ErrorEvent>().message))
     }
     continuation.invokeOnCancellation {
         removeEventListener("message", listener)
-        removeEventListener("error", listener)
+        removeEventListener("error", errorListener)
     }
     val msg = makeMessage(callId, data)
     this.postMessage(msg, transfer.toJsArray())
