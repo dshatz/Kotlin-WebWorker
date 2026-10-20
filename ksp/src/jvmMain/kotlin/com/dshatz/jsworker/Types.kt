@@ -26,8 +26,8 @@ object Types {
         val send = MemberName(pkg, "send")
         val sendIgnoreResult = MemberName(pkg, "sendIgnoreResult")
         val createWorkerFromModule = MemberName(pkg, "createWorkerFromModule")
-        val decodeFromJsObject = MemberName(pkg, "decodeFromJsObject")
-        val encodeToJsObject = MemberName(pkg, "encodeToJsObject")
+        val decodeFromJsObject = MemberName("${pkg}.serializers", "decodeFromJsObject")
+        val encodeToJsObject = MemberName("${pkg}.serializers", "encodeToJsObject")
     }
 
     val Worker = ClassName("org.w3c.dom", "Worker")

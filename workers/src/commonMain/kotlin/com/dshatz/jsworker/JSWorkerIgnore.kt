@@ -1,5 +1,5 @@
 package com.dshatz.jsworker
 
 @Target(AnnotationTarget.FUNCTION)
-@Retention(AnnotationRetention.SOURCE)
+@Retention(AnnotationRetention.BINARY)
 annotation class JSWorkerIgnore()

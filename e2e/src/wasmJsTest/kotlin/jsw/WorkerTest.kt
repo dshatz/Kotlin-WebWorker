@@ -81,7 +81,7 @@ class WorkerTest {
 
     @Test
     fun transferBuffer() = runTest {
-        val size = 1024*1024
+        val size = 1024*1024*10
         val worker = SampleWorkerWebWorker()
         val buffer = ArrayBuffer(size)
         val returnedBuffer = worker.buffer(buffer)

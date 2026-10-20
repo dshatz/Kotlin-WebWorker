@@ -1,7 +1,8 @@
 @file:OptIn(ExperimentalWasmJsInterop::class)
 
-package com.dshatz.jsworker
+package com.dshatz.jsworker.serializers
 
+import com.dshatz.jsworker.emptyJsObject
 import com.dshatz.jsworker.jstools.asJsObject
 import com.dshatz.jsworker.jstools.getPropertyValue
 import kotlinx.serialization.DeserializationStrategy
@@ -12,7 +13,6 @@ import kotlinx.serialization.encoding.AbstractDecoder
 import kotlinx.serialization.encoding.CompositeDecoder
 import kotlinx.serialization.modules.SerializersModule
 import kotlinx.serialization.serializer
-import org.khronos.webgl.ArrayBuffer
 import kotlin.js.ExperimentalWasmJsInterop
 import kotlin.js.JsAny
 import kotlin.js.toJsString

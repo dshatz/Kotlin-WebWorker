@@ -3,6 +3,8 @@
 package com.dshatz.jsworker
 
 import com.dshatz.jsworker.jstools.getPropertyValue
+import com.dshatz.jsworker.serializers.decodeFromJsObject
+import com.dshatz.jsworker.serializers.encodeToJsObject
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -55,12 +57,14 @@ inline fun <reified T, reified R: CallResponse<V>, reified V> Worker.sendIgnoreR
 
 suspend inline fun <reified T, reified R: CallResponse<V>, reified V> Worker.send(data: T, transfer: List<JsAny> = emptyList()): V = suspendCancellableCoroutine<V> { continuation ->
     val callId = callCounter.incrementAndFetch()
-    val listener = { event: Event ->
+    lateinit var listener: (Event) -> Unit
+    listener = { event: Event ->
         if (event is MessageEvent) {
             val obj = event.data ?: emptyJsObject()
             val responseCallId = getPropertyValue(obj, "callId").toString().toIntOrNull()
             val responseJs = getPropertyValue(obj, "data") ?: error("no data key in message: $obj")
             if (responseCallId == callId) {
+                removeEventListener("message", listener)
                 val response = decodeFromJsObject<R>(responseJs)
                 continuation.resume(response.value)
             }
@@ -69,11 +73,14 @@ suspend inline fun <reified T, reified R: CallResponse<V>, reified V> Worker.sen
         }
     }
     addEventListener("message", listener)
-    this.onerror = { event ->
+    lateinit var errorListener: (Event) -> Unit
+    errorListener = { event ->
+        removeEventListener("error", errorListener)
         continuation.resumeWithException(RuntimeException("onerror: " + event.unsafeCast<ErrorEvent>().message))
     }
     continuation.invokeOnCancellation {
         removeEventListener("message", listener)
+        removeEventListener("error", listener)
     }
     val msg = makeMessage(callId, data)
     this.postMessage(msg, transfer.toJsArray())

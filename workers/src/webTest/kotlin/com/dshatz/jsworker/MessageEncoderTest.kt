@@ -1,9 +1,9 @@
 package com.dshatz.jsworker
 
-import com.dshatz.jsworker.decodeFromJsObject
-import com.dshatz.jsworker.encodeToJsObject
+import com.dshatz.jsworker.serializers.decodeFromJsObject
 import com.dshatz.jsworker.jstools.asJsObject
 import com.dshatz.jsworker.jstools.getPropertyValue
+import com.dshatz.jsworker.serializers.encodeToJsObject
 import io.kotest.matchers.shouldBe
 import kotlinx.serialization.Contextual
 import kotlinx.serialization.Serializable

@@ -1,7 +1,5 @@
 package com.dshatz.jsworker.serializers
 
-import com.dshatz.jsworker.MessageDecoder
-import com.dshatz.jsworker.MessageEncoder
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.descriptors.PrimitiveKind
 import kotlinx.serialization.descriptors.PrimitiveSerialDescriptor

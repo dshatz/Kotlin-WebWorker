@@ -25,10 +25,13 @@ data class WorkerFun(
             .addParameters(parameters.map { it.toParameterSpec() })
     }
 
+    private fun getBufferCode(type: TypeName, name: String): CodeBlock {
+        return if (type == Types.ArrayBuffer) CodeBlock.of("%N", name)
+        else CodeBlock.of("%N.buffer", name)
+    }
     fun paramTransferArray(): CodeBlock {
         val values = parameters.filter { it.transfer }.joinToCode {
-            if (it.type == Types.ArrayBuffer) CodeBlock.of("%N", it.name)
-            else CodeBlock.of("%N.buffer", it.name)
+            getBufferCode(it.type, it.name)
         }
         return CodeBlock.of("listOf<%T>(%L)", Types.JsAny, values)
     }

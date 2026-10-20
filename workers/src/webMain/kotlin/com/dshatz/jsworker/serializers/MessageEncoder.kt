@@ -1,18 +1,9 @@
 @file:OptIn(ExperimentalWasmJsInterop::class)
 
-package com.dshatz.jsworker
+package com.dshatz.jsworker.serializers
 
+import com.dshatz.jsworker.emptyJsObject
 import com.dshatz.jsworker.jstools.isArrayBuffer
-import com.dshatz.jsworker.serializers.Float32ArraySerializer
-import com.dshatz.jsworker.serializers.Float64ArraySerializer
-import com.dshatz.jsworker.serializers.Int16ArraySerializer
-import com.dshatz.jsworker.serializers.Int32ArraySerializer
-import com.dshatz.jsworker.serializers.Int8ArraySerializer
-import com.dshatz.jsworker.serializers.UInt16ArraySerializer
-import com.dshatz.jsworker.serializers.UInt32ArraySerializer
-import com.dshatz.jsworker.serializers.UInt8ArraySerializer
-import com.dshatz.jsworker.serializers.Uint8ClampedArraySerializer
-import kotlinx.coroutines.NonCancellable.key
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.SerializationStrategy
@@ -28,12 +19,8 @@ import kotlinx.serialization.modules.SerializersModule
 import kotlinx.serialization.modules.contextual
 import kotlinx.serialization.serializer
 import org.khronos.webgl.ArrayBuffer
-import org.khronos.webgl.ArrayBufferView
-import org.khronos.webgl.Int8Array
 import kotlin.js.ExperimentalWasmJsInterop
 import kotlin.js.JsAny
-import kotlin.js.js
-import kotlin.js.toJsReference
 import kotlin.js.toJsString
 import kotlin.js.unsafeCast
 
