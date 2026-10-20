@@ -23,14 +23,20 @@ kotlin {
     jvmToolchain(21)
 
     js {
-        browser()
+        browser {
+            testTask {
+                useKarma {
+                    useFirefoxHeadless()
+                }
+            }
+        }
         nodejs()
     }
     wasmJs() {
         browser {
             testTask {
                 useKarma {
-                    useFirefox()
+                    useFirefoxHeadless()
                 }
             }
         }
